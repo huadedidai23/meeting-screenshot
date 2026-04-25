@@ -3,22 +3,22 @@
 import os
 import time
 import threading
-from PIL import Image
+from PyQt5.QtCore import QObject, pyqtSignal
 
 from meeting_screenshot.core.image_compare import calculate_difference
 from meeting_screenshot.utils.screenshot import capture_region
 
 
-class ScreenMonitor:
+class ScreenMonitor(QObject):
     """屏幕监控器，检测画面变化并保存截图"""
+    screenshot_saved = pyqtSignal(int)  # 发送截图计数信号
 
-    def __init__(self, save_folder, region=None, threshold=5.0,
-                 interval=1.5, on_screenshot=None):
+    def __init__(self, save_folder, region=None, threshold=5.0, interval=1.5):
+        super().__init__()
         self.save_folder = save_folder
         self.region = region
         self.threshold = threshold
         self.interval = interval
-        self.on_screenshot = on_screenshot  # 回调函数(count)
 
         self._running = False
         self._paused = False
@@ -97,5 +97,5 @@ class ScreenMonitor:
             filename = f"{self._counter:03d}.png"
             filepath = os.path.join(self.save_folder, filename)
             img.save(filepath, "PNG")
-            if self.on_screenshot:
-                self.on_screenshot(self._counter)
+            # 使用信号通知主线程
+            self.screenshot_saved.emit(self._counter)

@@ -2,11 +2,15 @@
 """会议截图工具 - 主程序入口"""
 import sys
 import os
-from PyQt5.QtWidgets import QApplication
+import tempfile
+import msvcrt
+from PyQt5.QtWidgets import QApplication, QMessageBox
 
 from meeting_screenshot.gui.main_window import MainWindow
 from meeting_screenshot.gui.tray_icon import TrayIcon
 from meeting_screenshot.core.screen_monitor import ScreenMonitor
+
+LOCK_FILE = os.path.join(tempfile.gettempdir(), "meeting_screenshot.lock")
 
 
 class MeetingScreenshotApp:
@@ -27,6 +31,10 @@ class MeetingScreenshotApp:
 
     def _start_monitoring(self, config):
         """开始监控"""
+        # 停止旧的监控器
+        if self.monitor and self.monitor.is_running:
+            self.monitor.stop()
+
         self.current_config = config
 
         # 创建监控器
@@ -34,9 +42,9 @@ class MeetingScreenshotApp:
             save_folder=config["save_folder"],
             region=config.get("region"),
             threshold=config["threshold"],
-            interval=config["interval"],
-            on_screenshot=self._on_screenshot
+            interval=config["interval"]
         )
+        self.monitor.screenshot_saved.connect(self._on_screenshot)
 
         # 创建托盘图标
         if not self.tray_icon:
@@ -91,8 +99,31 @@ class MeetingScreenshotApp:
 
 
 def main():
-    app = MeetingScreenshotApp()
-    sys.exit(app.run())
+    # 检查是否已有实例在运行
+    try:
+        lock_file = open(LOCK_FILE, 'w')
+        msvcrt.locking(lock_file.fileno(), msvcrt.LK_NBLCK, 1)
+    except (IOError, OSError):
+        # 已有实例在运行
+        app = QApplication(sys.argv)
+        QMessageBox.warning(None, "会议截图工具",
+                          "程序已经在运行中！\n请检查系统托盘。",
+                          QMessageBox.Ok)
+        sys.exit(1)
+
+    try:
+        app = MeetingScreenshotApp()
+        exit_code = app.run()
+    finally:
+        # 释放锁
+        try:
+            msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
+            lock_file.close()
+            os.remove(LOCK_FILE)
+        except:
+            pass
+
+    sys.exit(exit_code)
 
 
 if __name__ == "__main__":

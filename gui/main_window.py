@@ -137,9 +137,9 @@ class MainWindow(QWidget):
             self.folder_input.setText(folder)
 
     def _select_region(self):
-        selector = RegionSelector(self.monitors)
-        selector.region_selected.connect(self._on_region_selected)
-        selector.show()
+        self._selector = RegionSelector(self.monitors)
+        self._selector.region_selected.connect(self._on_region_selected)
+        self._selector.show()
 
     def _on_region_selected(self, region):
         self.config["region"] = region
